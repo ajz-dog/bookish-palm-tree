@@ -356,7 +356,12 @@
             ball.rotation.x += FORWARD_SPEED * 0.5;
             
             const lateralOffset = Math.sin(currentZ * 0.02) * 4;
-            ball.position.x = lateralOffset;
+            let targetX = lateralOffset;
+            
+            const trackHalfWidth = TRACK_WIDTH / 2 - 1.5;
+            targetX = Math.max(-trackHalfWidth, Math.min(trackHalfWidth, targetX));
+            
+            ball.position.x = targetX;
 
             const hue = (currentZ * 0.01) % 1;
             const color = new THREE.Color().setHSL(hue, 1, 0.5);
