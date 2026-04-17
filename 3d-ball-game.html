@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>无限 3D 球体游走 Demo</title>
+    <title>无限跑道 3D 球体游走 Demo</title>
     <style>
         * {
             margin: 0;
@@ -74,8 +74,8 @@
 </head>
 <body>
     <div id="info">
-        <h1>🚀 无限 3D 空间</h1>
-        <p>球体在无限延伸的空间中游走</p>
+        <h1>🏃 无限跑道 3D</h1>
+        <p>球体在无限延伸的跑道上游走</p>
     </div>
     <div id="canvas-container"></div>
     <div id="controls">
@@ -93,14 +93,16 @@
         let scene, camera, renderer, ball, controls;
         let velocity = new THREE.Vector3();
         let target = new THREE.Vector3();
-        const speed = 0.15;
+        const speed = 0.2;
         
-        const RENDER_DISTANCE = 100;
-        const CHUNK_SIZE = 20;
+        const RENDER_DISTANCE = 150;
+        const CHUNK_SIZE = 30;
+        const TRACK_WIDTH = 20;
         const activeChunks = new Map();
         const allObjects = [];
         
         let objectCountElement, positionZElement;
+        let trackMesh, leftWall, rightWall;
 
         function init() {
             scene = new THREE.Scene();
@@ -108,7 +110,7 @@
             scene.fog = new THREE.Fog(0x0a0a1a, 50, RENDER_DISTANCE);
 
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 0, 18);
+            camera.position.set(0, 8, 18);
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -126,6 +128,7 @@
             positionZElement = document.getElementById('position-z');
 
             setupLighting();
+            createTrack();
             createBall();
             setNewTarget();
 
@@ -134,16 +137,95 @@
         }
 
         function setupLighting() {
-            const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
             scene.add(ambientLight);
 
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            directionalLight.position.set(50, 50, 50);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(0, 50, 0);
             scene.add(directionalLight);
+
+            const pointLight1 = new THREE.PointLight(0x00ffff, 0.8, 100);
+            pointLight1.position.set(TRACK_WIDTH / 2, 10, 0);
+            scene.add(pointLight1);
+
+            const pointLight2 = new THREE.PointLight(0xff00ff, 0.8, 100);
+            pointLight2.position.set(-TRACK_WIDTH / 2, 10, 0);
+            scene.add(pointLight2);
+        }
+
+        function createTrack() {
+            const trackGeometry = new THREE.PlaneGeometry(TRACK_WIDTH, RENDER_DISTANCE * 3, 1, 100);
+            const trackMaterial = new THREE.MeshStandardMaterial({
+                color: 0x1a1a3e,
+                metalness: 0.3,
+                roughness: 0.8
+            });
+            trackMesh = new THREE.Mesh(trackGeometry, trackMaterial);
+            trackMesh.rotation.x = -Math.PI / 2;
+            trackMesh.position.y = -2;
+            trackMesh.receiveShadow = true;
+            scene.add(trackMesh);
+
+            createTrackLines();
+
+            const wallGeometry = new THREE.PlaneGeometry(RENDER_DISTANCE * 3, 10, 100, 1);
+            const wallMaterial = new THREE.MeshStandardMaterial({
+                color: 0x2a2a4e,
+                metalness: 0.2,
+                roughness: 0.7,
+                side: THREE.DoubleSide
+            });
+
+            leftWall = new THREE.Mesh(wallGeometry, wallMaterial);
+            leftWall.position.set(-TRACK_WIDTH / 2 - 0.5, 3, 0);
+            leftWall.rotation.y = Math.PI / 2;
+            scene.add(leftWall);
+
+            rightWall = new THREE.Mesh(wallGeometry, wallMaterial);
+            rightWall.position.set(TRACK_WIDTH / 2 + 0.5, 3, 0);
+            rightWall.rotation.y = -Math.PI / 2;
+            scene.add(rightWall);
+        }
+
+        function createTrackLines() {
+            const lineGroup = new THREE.Group();
+            
+            const centerLineGeometry = new THREE.BufferGeometry();
+            const centerLineVertices = [];
+            for (let z = -RENDER_DISTANCE * 1.5; z <= RENDER_DISTANCE * 1.5; z += 2) {
+                centerLineVertices.push(0, -1.99, z);
+                centerLineVertices.push(0, -1.99, z + 1);
+            }
+            centerLineGeometry.setAttribute('position', new THREE.Float32BufferAttribute(centerLineVertices, 3));
+            const centerLineMaterial = new THREE.LineBasicMaterial({ color: 0xffff00 });
+            const centerLine = new THREE.LineSegments(centerLineGeometry, centerLineMaterial);
+            lineGroup.add(centerLine);
+
+            const edgeLineMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 });
+            
+            const leftEdgeGeometry = new THREE.BufferGeometry();
+            const leftEdgeVertices = [];
+            for (let z = -RENDER_DISTANCE * 1.5; z <= RENDER_DISTANCE * 1.5; z += 0.5) {
+                leftEdgeVertices.push(-TRACK_WIDTH / 2 + 0.5, -1.99, z);
+            }
+            leftEdgeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(leftEdgeVertices, 3));
+            const leftEdge = new THREE.Line(leftEdgeGeometry, edgeLineMaterial);
+            lineGroup.add(leftEdge);
+
+            const rightEdgeGeometry = new THREE.BufferGeometry();
+            const rightEdgeVertices = [];
+            for (let z = -RENDER_DISTANCE * 1.5; z <= RENDER_DISTANCE * 1.5; z += 0.5) {
+                rightEdgeVertices.push(TRACK_WIDTH / 2 - 0.5, -1.99, z);
+            }
+            rightEdgeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(rightEdgeVertices, 3));
+            const rightEdge = new THREE.Line(rightEdgeGeometry, edgeLineMaterial);
+            lineGroup.add(rightEdge);
+
+            scene.add(lineGroup);
         }
 
         function createBall() {
-            const geometry = new THREE.SphereGeometry(1.5, 64, 64);
+            const geometry = new THREE.SphereGeometry(1.2, 64, 64);
             const material = new THREE.MeshPhysicalMaterial({
                 color: 0x00ffff,
                 metalness: 0.3,
@@ -154,9 +236,10 @@
                 emissiveIntensity: 0.3
             });
             ball = new THREE.Mesh(geometry, material);
+            ball.position.y = 0;
             scene.add(ball);
 
-            const glowGeometry = new THREE.SphereGeometry(2, 32, 32);
+            const glowGeometry = new THREE.SphereGeometry(1.6, 32, 32);
             const glowMaterial = new THREE.MeshBasicMaterial({
                 color: 0x00ffff,
                 transparent: true,
@@ -166,102 +249,101 @@
             ball.add(glow);
         }
 
-        function getChunkKey(x, z) {
-            return `${Math.floor(x / CHUNK_SIZE)},${Math.floor(z / CHUNK_SIZE)}`;
+        function getChunkKey(z) {
+            return `${Math.floor(z / CHUNK_SIZE)}`;
         }
 
-        function createChunkContent(chunkX, chunkZ) {
+        function createChunkContent(chunkZ) {
             const objects = [];
-            const baseX = chunkX * CHUNK_SIZE;
             const baseZ = chunkZ * CHUNK_SIZE;
 
-            const numBoxes = Math.floor(Math.random() * 3) + 1;
-            for (let i = 0; i < numBoxes; i++) {
-                const size = Math.random() * 2 + 0.5;
-                const geometry = new THREE.BoxGeometry(size, size, size);
+            const numObstacles = Math.floor(Math.random() * 4) + 2;
+            for (let i = 0; i < numObstacles; i++) {
+                const obstacleType = Math.floor(Math.random() * 4);
+                let geometry, size;
+
+                switch (obstacleType) {
+                    case 0:
+                        size = Math.random() * 1.5 + 0.5;
+                        geometry = new THREE.BoxGeometry(size, size, size);
+                        break;
+                    case 1:
+                        size = Math.random() * 1 + 0.5;
+                        geometry = new THREE.ConeGeometry(size, size * 2, 6);
+                        break;
+                    case 2:
+                        size = Math.random() * 0.8 + 0.4;
+                        geometry = new THREE.OctahedronGeometry(size);
+                        break;
+                    case 3:
+                        size = Math.random() * 1 + 0.5;
+                        geometry = new THREE.CylinderGeometry(size * 0.5, size, size * 1.5, 8);
+                        break;
+                }
+
                 const hue = Math.random();
                 const material = new THREE.MeshStandardMaterial({
                     color: new THREE.Color().setHSL(hue, 0.8, 0.5),
                     metalness: 0.5,
                     roughness: 0.5
                 });
-                const box = new THREE.Mesh(geometry, material);
-                box.position.set(
-                    baseX + Math.random() * CHUNK_SIZE - CHUNK_SIZE / 2,
-                    Math.random() * 10 - 5,
+
+                const obstacle = new THREE.Mesh(geometry, material);
+                obstacle.position.set(
+                    (Math.random() - 0.5) * (TRACK_WIDTH - 4),
+                    size / 2,
                     baseZ + Math.random() * CHUNK_SIZE - CHUNK_SIZE / 2
                 );
-                box.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-                box.userData.isChunkObject = true;
-                objects.push(box);
-                scene.add(box);
-                allObjects.push(box);
+                obstacle.rotation.set(
+                    Math.random() * Math.PI,
+                    Math.random() * Math.PI,
+                    Math.random() * Math.PI
+                );
+                obstacle.userData.isChunkObject = true;
+                obstacle.userData.originalY = obstacle.position.y;
+                objects.push(obstacle);
+                scene.add(obstacle);
+                allObjects.push(obstacle);
             }
 
-            const numPyramids = Math.floor(Math.random() * 2) + 1;
-            for (let i = 0; i < numPyramids; i++) {
-                const geometry = new THREE.ConeGeometry(1, 2, 4);
-                const hue = Math.random();
-                const material = new THREE.MeshStandardMaterial({
-                    color: new THREE.Color().setHSL(hue, 0.8, 0.6),
-                    metalness: 0.3,
-                    roughness: 0.7
+            const numMarkers = 2;
+            for (let i = 0; i < numMarkers; i++) {
+                const markerGeometry = new THREE.RingGeometry(0.3, 0.5, 16);
+                const markerMaterial = new THREE.MeshBasicMaterial({
+                    color: 0x00ff00,
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0.6
                 });
-                const pyramid = new THREE.Mesh(geometry, material);
-                pyramid.position.set(
-                    baseX + Math.random() * CHUNK_SIZE - CHUNK_SIZE / 2,
-                    Math.random() * 10 - 5,
-                    baseZ + Math.random() * CHUNK_SIZE - CHUNK_SIZE / 2
+                const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+                marker.rotation.x = -Math.PI / 2;
+                marker.position.set(
+                    0,
+                    -1.9,
+                    baseZ + (i === 0 ? -CHUNK_SIZE / 4 : CHUNK_SIZE / 4)
                 );
-                pyramid.rotation.y = Math.random() * Math.PI;
-                pyramid.userData.isChunkObject = true;
-                objects.push(pyramid);
-                scene.add(pyramid);
-                allObjects.push(pyramid);
-            }
-
-            const numOctahedrons = Math.floor(Math.random() * 2);
-            for (let i = 0; i < numOctahedrons; i++) {
-                const geometry = new THREE.OctahedronGeometry(0.8);
-                const hue = Math.random();
-                const material = new THREE.MeshStandardMaterial({
-                    color: new THREE.Color().setHSL(hue, 0.9, 0.5),
-                    metalness: 0.7,
-                    roughness: 0.3
-                });
-                const octahedron = new THREE.Mesh(geometry, material);
-                octahedron.position.set(
-                    baseX + Math.random() * CHUNK_SIZE - CHUNK_SIZE / 2,
-                    Math.random() * 10 - 5,
-                    baseZ + Math.random() * CHUNK_SIZE - CHUNK_SIZE / 2
-                );
-                octahedron.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-                octahedron.userData.isChunkObject = true;
-                objects.push(octahedron);
-                scene.add(octahedron);
-                allObjects.push(octahedron);
+                marker.userData.isChunkObject = true;
+                objects.push(marker);
+                scene.add(marker);
+                allObjects.push(marker);
             }
 
             return objects;
         }
 
         function updateChunks() {
-            const ballChunkX = Math.floor(ball.position.x / CHUNK_SIZE);
             const ballChunkZ = Math.floor(ball.position.z / CHUNK_SIZE);
             const viewDistance = Math.ceil(RENDER_DISTANCE / CHUNK_SIZE);
 
             const neededChunks = new Set();
-            for (let dx = -viewDistance; dx <= viewDistance; dx++) {
-                for (let dz = -viewDistance; dz <= viewDistance; dz++) {
-                    const cx = ballChunkX + dx;
-                    const cz = ballChunkZ + dz;
-                    const key = `${cx},${cz}`;
-                    neededChunks.add(key);
+            for (let dz = -viewDistance; dz <= viewDistance; dz++) {
+                const cz = ballChunkZ + dz;
+                const key = `${cz}`;
+                neededChunks.add(key);
 
-                    if (!activeChunks.has(key)) {
-                        const objects = createChunkContent(cx, cz);
-                        activeChunks.set(key, objects);
-                    }
+                if (!activeChunks.has(key)) {
+                    const objects = createChunkContent(cz);
+                    activeChunks.set(key, objects);
                 }
             }
 
@@ -289,21 +371,33 @@
             objectCountElement.textContent = allObjects.length;
         }
 
+        function updateTrack() {
+            trackMesh.position.z = Math.floor(ball.position.z / (RENDER_DISTANCE * 0.5)) * (RENDER_DISTANCE * 0.5);
+            leftWall.position.z = trackMesh.position.z;
+            rightWall.position.z = trackMesh.position.z;
+        }
+
         function setNewTarget() {
-            target.x = (Math.random() - 0.5) * 200;
-            target.y = (Math.random() - 0.5) * 40;
-            target.z = (Math.random() - 0.5) * 200;
+            target.x = (Math.random() - 0.5) * (TRACK_WIDTH - 6);
+            target.y = 0;
+            target.z = ball.position.z + (Math.random() > 0.5 ? 1 : -1) * (Math.random() * 100 + 50);
         }
 
         function updateBall() {
             const direction = new THREE.Vector3().subVectors(target, ball.position).normalize();
-            velocity.lerp(direction.multiplyScalar(speed), 0.02);
+            velocity.lerp(direction.multiplyScalar(speed), 0.03);
+            
+            velocity.x *= 0.98;
+            
             ball.position.add(velocity);
-            ball.rotation.x += velocity.z * 0.3;
+            
+            ball.position.x = Math.max(-TRACK_WIDTH / 2 + 2, Math.min(TRACK_WIDTH / 2 - 2, ball.position.x));
+            
+            ball.rotation.x += velocity.z * 0.5;
             ball.rotation.z -= velocity.x * 0.3;
 
-            const distance = ball.position.distanceTo(target);
-            if (distance < 5) {
+            const distance = Math.abs(ball.position.z - target.z);
+            if (distance < 10) {
                 setNewTarget();
             }
 
@@ -314,19 +408,19 @@
 
             positionZElement.textContent = Math.round(ball.position.z);
 
-            camera.position.x = ball.position.x;
-            camera.position.y = ball.position.y + 5;
+            camera.position.x = ball.position.x * 0.3;
+            camera.position.y = 8;
             camera.position.z = ball.position.z + 18;
-            controls.target.set(ball.position.x, ball.position.y, ball.position.z);
+            controls.target.set(ball.position.x, 2, ball.position.z);
         }
 
         function animateObjects() {
             const time = Date.now() * 0.001;
             for (const obj of allObjects) {
-                if (obj.userData.isChunkObject) {
-                    obj.rotation.x += 0.005;
-                    obj.rotation.y += 0.003;
-                    obj.position.y += Math.sin(time + obj.position.x) * 0.002;
+                if (obj.userData.isChunkObject && obj.userData.originalY !== undefined) {
+                    obj.rotation.x += 0.01;
+                    obj.rotation.y += 0.005;
+                    obj.position.y = obj.userData.originalY + Math.sin(time * 2 + obj.position.z * 0.1) * 0.3;
                 }
             }
         }
@@ -341,6 +435,7 @@
         function animate() {
             requestAnimationFrame(animate);
             updateBall();
+            updateTrack();
             animateObjects();
             
             chunkUpdateTimer++;
