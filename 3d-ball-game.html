@@ -92,7 +92,7 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script>
         let scene, camera, renderer, ball, controls;
-        const FORWARD_SPEED = 0.3;
+        const MOVE_SPEED = 0.3;
         const TRACK_WIDTH = 15;
         const TRACK_SEGMENT_LENGTH = 30;
         const RENDER_DISTANCE_FORWARD = 200;
@@ -101,6 +101,7 @@
         const activeSegments = new Map();
         const allObjects = [];
         let currentZ = 0;
+        let keysPressed = {};
         
         let objectCountElement, distanceElement, speedElement;
 
@@ -132,6 +133,12 @@
             createBall();
 
             window.addEventListener('resize', onWindowResize);
+            window.addEventListener('keydown', (event) => {
+                keysPressed[event.key.toLowerCase()] = true;
+            });
+            window.addEventListener('keyup', (event) => {
+                keysPressed[event.key.toLowerCase()] = false;
+            });
             animate();
         }
 
@@ -349,19 +356,36 @@
         }
 
         function updateBall() {
-            currentZ += FORWARD_SPEED;
+            let moveZ = 0;
+            let moveX = 0;
             
+            if (keysPressed['w']) {
+                moveZ += MOVE_SPEED;
+            }
+            if (keysPressed['s']) {
+                moveZ -= MOVE_SPEED;
+            }
+            if (keysPressed['a']) {
+                moveX -= MOVE_SPEED;
+            }
+            if (keysPressed['d']) {
+                moveX += MOVE_SPEED;
+            }
+            
+            currentZ += moveZ;
             ball.position.z = currentZ;
             
-            ball.rotation.x += FORWARD_SPEED * 0.5;
-            
-            const lateralOffset = Math.sin(currentZ * 0.02) * 4;
-            let targetX = lateralOffset;
-            
+            let targetX = ball.position.x + moveX;
             const trackHalfWidth = TRACK_WIDTH / 2 - 1.5;
             targetX = Math.max(-trackHalfWidth, Math.min(trackHalfWidth, targetX));
-            
             ball.position.x = targetX;
+            
+            if (moveZ !== 0) {
+                ball.rotation.x += moveZ * 0.5;
+            }
+            if (moveX !== 0) {
+                ball.rotation.z -= moveX * 0.5;
+            }
 
             const hue = (currentZ * 0.01) % 1;
             const color = new THREE.Color().setHSL(hue, 1, 0.5);
@@ -369,7 +393,8 @@
             ball.material.emissive = color;
 
             distanceElement.textContent = Math.round(currentZ);
-            speedElement.textContent = (FORWARD_SPEED * 60).toFixed(1);
+            const currentSpeed = Math.sqrt(moveX * moveX + moveZ * moveZ) * 60;
+            speedElement.textContent = currentSpeed.toFixed(1);
 
             camera.position.x = ball.position.x;
             camera.position.y = 10;
