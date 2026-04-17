@@ -376,7 +376,8 @@
             ball.position.z = currentZ;
             
             let targetX = ball.position.x + moveX;
-            const trackHalfWidth = TRACK_WIDTH / 2 - 1.5;
+            const ballRadius = 1.2;
+            const trackHalfWidth = TRACK_WIDTH / 2 - ballRadius;
             targetX = Math.max(-trackHalfWidth, Math.min(trackHalfWidth, targetX));
             ball.position.x = targetX;
             
